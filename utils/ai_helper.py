@@ -317,6 +317,10 @@ def get_ai_response(question: str, context: str = None, df=None) -> str:
     if not api_key:
         api_key = os.getenv("GOOGLE_API_KEY", "")
 
+    # 🔑 CLÉ API PAR DÉFAUT - REMPLACEZ PAR VOTRE CLÉ GEMINI
+    if not api_key:
+        api_key = "AIzaSyDtsa9wm5wbanlZ-UGTAv6Zs73vARraIYk"  # ← CLÉ GEMINI CONFIGURÉE
+
     api_key = (api_key or "").strip()
     
     if not api_key:
@@ -1035,3 +1039,4 @@ def extract_text_value(text: str, keyword: str) -> str:
         return match.group(1).strip()
     
     return "N/A"
+
