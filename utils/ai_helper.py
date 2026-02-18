@@ -324,8 +324,16 @@ def get_ai_response(question: str, context: str = None, df=None) -> str:
         hf_response = try_huggingface_api(question, df)
         if hf_response:
             return hf_response
-        # Si même Hugging Face échoue, retourner erreur
-        return "❌ Impossible de générer une réponse IA. Veuillez réessayer."
+        # Troisième fallback: utiliser l'IA locale (DataAnalyzerAI)
+        if df is not None:
+            try:
+                local_ai = DataAnalyzerAI(df)
+                local_response = local_ai.answer_question(question)
+                return local_response
+            except Exception:
+                pass
+        # Si tout échoue, retourner erreur
+        return "❌ Service IA temporairement indisponible. Veuillez réessayer."
     
     try:
         import google.generativeai as genai
@@ -359,6 +367,14 @@ Réponse ultra-courte (1-2 phrases MAX):"""
         hf_response = try_huggingface_api(question, df)
         if hf_response:
             return hf_response
+        # Fallback final: IA locale
+        if df is not None:
+            try:
+                local_ai = DataAnalyzerAI(df)
+                local_response = local_ai.answer_question(question)
+                return local_response
+            except Exception:
+                pass
         return f"❌ Erreur: {str(e)}"
 
 
@@ -463,53 +479,51 @@ def _build_advanced_context(df) -> str:
 def try_huggingface_api(question: str, df=None) -> str:
     """
     Utiliser Hugging Face Inference API (GRATUIT, pas de clé nécessaire)
-    Utilise le modèle 'HuggingFaceH4/zephyr-7b-beta' qui est très bon et gratuit
+    Utilise le modèle 'mistralai/Mistral-7B-Instruct-v0.1' qui est plus rapide
     """
     try:
-        # Construire le contexte des données si df est fourni
+        # Construire un contexte SIMPLE (pas trop long pour Hugging Face)
         context_text = ""
         if df is not None and len(df) > 0:
-            context_text = _build_advanced_context(df)
+            context_text = f"Dataset: {len(df)} rows × {len(df.columns)} columns\n"
+            numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+            if numeric_cols:
+                context_text += f"Numeric columns: {', '.join(numeric_cols[:5])}\n"
         
-        # API Hugging Face gratuite
-        url = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta"
+        # API Hugging Face gratuite (modèle plus stable)
+        url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
         
-        # Créer le prompt
-        prompt = f"""Tu es un expert en analyse de données en français.
-Réponds TOUJOURS en français, sois concis (1-2 phrases MAX).
-Pas d'explications longues, juste la réponse directe.
+        # Prompt simplifié
+        prompt = f"""Répondez en français, brièvement (1-2 phrases).
 
-CONTEXTE DES DONNÉES:
 {context_text}
 
-QUESTION DE L'UTILISATEUR:
-{question}
-
-RÉPONSE DIRECTE (1-2 phrases):"""
+Question: {question}
+Réponse:"""
         
         headers = {
-            "Authorization": "Bearer hf_placeholder"  # Pas d'authentification requise
+            "Authorization": "Bearer hf_placeholder"
         }
         
         payload = {
             "inputs": prompt,
             "parameters": {
-                "max_new_tokens": 100,
-                "temperature": 0.7,
+                "max_new_tokens": 80,
+                "temperature": 0.5,
             }
         }
         
-        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        response = requests.post(url, json=payload, headers=headers, timeout=25)
         
         if response.status_code == 200:
             result = response.json()
             if isinstance(result, list) and len(result) > 0:
                 answer = result[0].get("generated_text", "")
-                # Extraire juste la réponse (après le prompt)
-                if "RÉPONSE DIRECTE" in answer:
-                    answer = answer.split("RÉPONSE DIRECTE (1-2 phrases):")[-1]
+                # Extraire juste la réponse (après "Réponse:")
+                if "Réponse:" in answer:
+                    answer = answer.split("Réponse:")[-1]
                 answer = answer.strip()
-                if answer:
+                if answer and len(answer) > 3:
                     return answer
         
         return None
