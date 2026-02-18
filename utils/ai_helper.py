@@ -462,105 +462,82 @@ def _build_advanced_context(df) -> str:
 
 def try_huggingface_api(question: str, df=None) -> str:
     """
-    Utiliser Hugging Face Inference API avec contexte data RÉEL + CORRÉLATIONS + PRÉDICTIONS
+    Utiliser Hugging Face Inference API - version optimisée pour stabilité
     """
     try:
-        # Construire un contexte COMPLET avec vraies données, corrélations ET prédictions
+        # Construire un contexte MINIMALISTE mais efficace
         context_text = ""
         if df is not None and len(df) > 0:
             numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
-            categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
             
-            # Info rapide
-            context_text = f"""DATASET STATS:
-- {len(df)} rows, {len(df.columns)} cols ({len(numeric_cols)} numeric, {len(categorical_cols)} categorical)
-- Missing: {df.isnull().sum().sum()} values
-- Duplicates: {df.duplicated().sum()} rows
-
-NUMERIC COLUMNS STATS & TRENDS:"""
+            # Stats simples et rapides
+            context_text = f"Rows: {len(df)}, Cols: {len(df.columns)}\n"
             
-            # Stats détaillées + TENDANCES pour chaque colonne numérique
-            for col in numeric_cols[:5]:
+            # Juste les stats essentielles des colonnes numériques (max 3)
+            for col in numeric_cols[:3]:
                 try:
                     col_data = df[col].dropna()
                     if len(col_data) > 1:
                         mean_val = col_data.mean()
                         min_val = col_data.min()
                         max_val = col_data.max()
-                        median_val = col_data.median()
                         
-                        # Calculer la tendance (croissance/décroissance)
+                        # Tendance simple
                         first_half = col_data.iloc[:len(col_data)//2].mean()
                         second_half = col_data.iloc[len(col_data)//2:].mean()
-                        trend = "📈 INCREASING" if second_half > first_half * 1.05 else ("📉 DECREASING" if second_half < first_half * 0.95 else "➡️ STABLE")
-                        growth_rate = ((second_half - first_half) / first_half * 100) if first_half != 0 else 0
+                        trend = "UP" if second_half > first_half * 1.05 else ("DOWN" if second_half < first_half * 0.95 else "STABLE")
                         
-                        context_text += f"\n  {col}: mean={mean_val:.2f}, min={min_val:.2f}, max={max_val:.2f}, median={median_val:.2f}"
-                        context_text += f"\n    Trend: {trend} (growth: {growth_rate:+.1f}%)"
+                        context_text += f"{col}: mean={mean_val:.1f}, min={min_val:.1f}, max={max_val:.1f}, trend={trend}\n"
                 except:
                     pass
-            
-            # CORRÉLATIONS entre colonnes numériques
-            if len(numeric_cols) > 1:
-                try:
-                    context_text += "\n\nCORRELATIONS BETWEEN COLUMNS:"
-                    corr_matrix = df[numeric_cols].corr()
-                    for i in range(len(numeric_cols)):
-                        for j in range(i+1, len(numeric_cols)):
-                            corr_val = corr_matrix.iloc[i, j]
-                            if abs(corr_val) > 0.2:
-                                strength = "STRONG" if abs(corr_val) > 0.7 else "MODERATE" if abs(corr_val) > 0.4 else "WEAK"
-                                context_text += f"\n  {numeric_cols[i]} <-> {numeric_cols[j]}: {corr_val:.3f} ({strength})"
-                except:
-                    pass
-            
-            if categorical_cols:
-                context_text += f"\n\nCATEGORICAL COLUMNS: {', '.join(categorical_cols[:5])}"
         
-        # API Hugging Face (modèle simple et rapide)
-        url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
+        # API Hugging Face - modèle très léger et rapide
+        url = "https://api-inference.huggingface.co/models/gpt2"
         
-        # Prompt avec instructions pour prédictions ET CONSEILS
-        prompt = f"""You are a data analyst. Analyze this data and answer the user's question.
-Use SPECIFIC VALUES from the stats, trends, and correlations.
-If asked about future/predictions: analyze trends and growth rates to make predictions.
-If asked for advice: give SPECIFIC recommendations based on the data trends and correlations.
-Be concise (1-2 sentences max).
-
-DATA CONTEXT:
-{context_text}
-
-USER QUESTION: {question}
-
-ANSWER (with specific numbers, trends, and predictions/recommendations):"""
+        # Prompt ultra-simplifié
+        prompt = f"Analyze data and answer concisely (1 sentence):\n{context_text}\nQuestion: {question}\nAnswer:"
         
         headers = {"Authorization": "Bearer hf_placeholder"}
         
         payload = {
             "inputs": prompt,
             "parameters": {
-                "max_new_tokens": 120,
-                "temperature": 0.4,
+                "max_new_tokens": 60,
+                "temperature": 0.5,
             }
         }
         
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
-        
-        if response.status_code == 200:
-            result = response.json()
-            if isinstance(result, list) and len(result) > 0:
-                answer = result[0].get("generated_text", "")
-                # Extract just the answer part
-                if "ANSWER" in answer:
-                    answer = answer.split("ANSWER (with specific numbers, trends, and predictions/recommendations):")[-1]
-                answer = answer.strip()
-                if answer and len(answer) > 5:
-                    return answer
+        # Essayer avec timeout court d'abord
+        for timeout in [15, 25]:
+            try:
+                response = requests.post(url, json=payload, headers=headers, timeout=timeout)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if isinstance(result, list) and len(result) > 0:
+                        answer = result[0].get("generated_text", "")
+                        # Extract answer after "Answer:"
+                        if "Answer:" in answer:
+                            answer = answer.split("Answer:")[-1]
+                        answer = answer.strip()
+                        if answer and len(answer) > 3:
+                            return answer
+                    return None
+                elif response.status_code == 503:
+                    # Model loading, retry with longer timeout
+                    continue
+                else:
+                    return None
+            except requests.Timeout:
+                if timeout == 15:
+                    continue  # Try with longer timeout
+                else:
+                    return None
         
         return None
     
     except Exception as e:
-        print(f"Hugging Face API error: {e}")
+        print(f"HF error: {e}")
         return None
 
 
