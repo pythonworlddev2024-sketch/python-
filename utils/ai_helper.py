@@ -1,11 +1,12 @@
 """
 Assistant IA pour l'analyse de données
-Utilise analyse locale intelligente + Google Gemini (gratuit) optionnel
+Utilise analyse locale intelligente + Google Gemini (gratuit) optionnel + Hugging Face API fallback
 """
 import os
 import re
 import pandas as pd
 import numpy as np
+import requests
 from difflib import SequenceMatcher
 
 
@@ -290,10 +291,41 @@ def get_ai_response(question: str, context: str = None, df=None) -> str:
     Inclut: statistiques descriptives, corrélations, tendances, distributions
     """
     
-    api_key = os.getenv("GOOGLE_API_KEY", "").strip()
+    api_key = ""
+    try:
+        import streamlit as st
+        # Try session state first (user-provided key)
+        api_key = st.session_state.get("google_api_key", "")
+        # If not in session, try secrets
+        if not api_key:
+            candidates = [
+                "GOOGLE_API_KEY", "google_api_key", "googleApiKey",
+                "google.api_key", "googleapikey", "api_key"
+            ]
+            for key in candidates:
+                if key in st.secrets:
+                    api_key = st.secrets[key]
+                    break
+            # Try nested dict
+            if not api_key and "google" in st.secrets:
+                google_sect = st.secrets["google"]
+                if isinstance(google_sect, dict):
+                    api_key = google_sect.get("api_key") or google_sect.get("GOOGLE_API_KEY") or ""
+    except Exception:
+        pass
+
+    if not api_key:
+        api_key = os.getenv("GOOGLE_API_KEY", "")
+
+    api_key = (api_key or "").strip()
     
     if not api_key:
-        return "❌ Clé API Google manquante. Définis GOOGLE_API_KEY."
+        # Fallback: utiliser Hugging Face API (GRATUIT, pas de clé nécessaire)
+        hf_response = try_huggingface_api(question, df)
+        if hf_response:
+            return hf_response
+        # Si même Hugging Face échoue, retourner erreur
+        return "❌ Impossible de générer une réponse IA. Veuillez réessayer."
     
     try:
         import google.generativeai as genai
@@ -322,8 +354,12 @@ Réponse ultra-courte (1-2 phrases MAX):"""
             return "❌ Pas de réponse de Gemini"
             
     except Exception as e:
-        print(f"❌ Erreur: {str(e)}")
-        return f"❌ Erreur Gemini: {str(e)}"
+        print(f"❌ Erreur Google: {str(e)}")
+        # Fallback à Hugging Face en cas d'erreur Google aussi
+        hf_response = try_huggingface_api(question, df)
+        if hf_response:
+            return hf_response
+        return f"❌ Erreur: {str(e)}"
 
 
 def _build_advanced_context(df) -> str:
@@ -424,29 +460,35 @@ def _build_advanced_context(df) -> str:
     return "\n".join(lines)
 
 
-def try_huggingface_api(question: str, context: str = None) -> str:
+def try_huggingface_api(question: str, df=None) -> str:
     """
     Utiliser Hugging Face Inference API (GRATUIT, pas de clé nécessaire)
     Utilise le modèle 'HuggingFaceH4/zephyr-7b-beta' qui est très bon et gratuit
     """
     try:
-        # API Hugging Face gratuite (pas d'authentification pour les modèles libres)
+        # Construire le contexte des données si df est fourni
+        context_text = ""
+        if df is not None and len(df) > 0:
+            context_text = _build_advanced_context(df)
+        
+        # API Hugging Face gratuite
         url = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta"
         
         # Créer le prompt
         prompt = f"""Tu es un expert en analyse de données en français.
-Réponds TOUJOURS en français, sois concis (1-2 phrases).
+Réponds TOUJOURS en français, sois concis (1-2 phrases MAX).
+Pas d'explications longues, juste la réponse directe.
 
 CONTEXTE DES DONNÉES:
-{context}
+{context_text}
 
 QUESTION DE L'UTILISATEUR:
 {question}
 
-RÉPONDS DIRECTEMENT AVEC LES VALEURS SPÉCIFIQUES:"""
+RÉPONSE DIRECTE (1-2 phrases):"""
         
         headers = {
-            "Authorization": "Bearer hf_placeholder"  # Même sans clé, ça marche pour les modèles publics
+            "Authorization": "Bearer hf_placeholder"  # Pas d'authentification requise
         }
         
         payload = {
@@ -457,20 +499,23 @@ RÉPONDS DIRECTEMENT AVEC LES VALEURS SPÉCIFIQUES:"""
             }
         }
         
-        response = requests.post(url, json=payload, headers=headers, timeout=8)
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
         
         if response.status_code == 200:
             result = response.json()
             if isinstance(result, list) and len(result) > 0:
                 answer = result[0].get("generated_text", "")
                 # Extraire juste la réponse (après le prompt)
-                if "RÉPONDS" in answer:
-                    answer = answer.split("RÉPONDS DIRECTEMENT AVEC LES VALEURS SPÉCIFIQUES:")[-1]
-                return answer.strip()
+                if "RÉPONSE DIRECTE" in answer:
+                    answer = answer.split("RÉPONSE DIRECTE (1-2 phrases):")[-1]
+                answer = answer.strip()
+                if answer:
+                    return answer
         
         return None
     
     except Exception as e:
+        print(f"Hugging Face API error: {e}")
         return None
 
 

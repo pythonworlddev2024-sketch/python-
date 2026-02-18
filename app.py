@@ -6,6 +6,30 @@ Application web pour l'analyse de données et la prédiction avec IA gratuite
 import streamlit as st
 from config import APP_TITLE, APP_ICON
 
+# Initialize session state for API key
+if "google_api_key" not in st.session_state:
+    st.session_state.google_api_key = ""
+
+# Try to load from Streamlit secrets first
+if not st.session_state.google_api_key:
+    api_key = st.secrets.get("GOOGLE_API_KEY") or st.secrets.get("google", {}).get("api_key") or ""
+    if api_key:
+        st.session_state.google_api_key = api_key
+
+# Optional: Allow user to enter API key for faster/better AI responses
+if not st.session_state.google_api_key:
+    with st.expander("🚀 (Optionnel) Activer Google Gemini pour des réponses IA plus rapides"):
+        st.info("L'IA fonctionne déjà gratuitement. Entrez une clé Google Gemini API pour des réponses plus rapides et de meilleure qualité.")
+        api_key_input = st.text_input(
+            "Google API Key (Gemini)",
+            type="password",
+            placeholder="AIzaSy...",
+            help="Facultatif. Votre clé sera stockée en session seulement."
+        )
+        if api_key_input:
+            st.session_state.google_api_key = api_key_input
+            st.success("✅ Clé Gemini activée !")
+
 # Configuration de la page Streamlit
 st.set_page_config(
     page_title=APP_TITLE,
