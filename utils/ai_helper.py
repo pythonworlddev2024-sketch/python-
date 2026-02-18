@@ -324,8 +324,11 @@ def get_ai_response(question: str, context: str = None, df=None) -> str:
         hf_response = try_huggingface_api(question, df)
         if hf_response:
             return hf_response
-        # Si Hugging Face échoue, retourner erreur
-        return "❌ Service IA temporairement indisponible. Veuillez réessayer."
+        # FALLBACK FINAL: Réponses intelligentes basées sur stats locales (TOUJOURS disponible)
+        if df is not None:
+            return generate_local_insight(question, df)
+        # Si pas de données du tout
+        return "❌ Veuillez charger des données pour utiliser l'IA."
     
     try:
         import google.generativeai as genai
@@ -539,6 +542,189 @@ def try_huggingface_api(question: str, df=None) -> str:
     except Exception as e:
         print(f"HF error: {e}")
         return None
+
+
+def generate_local_insight(question: str, df) -> str:
+    """
+    Générer des insights locaux ROBUSTES si l'AI externe n'est pas disponible.
+    Répond à des questions spécifiques sur les VRAIES données du DataFrame.
+    """
+    if df is None or df.empty:
+        return "Aucune donnée disponible. Veuillez d'abord charger vos données."
+    
+    question_lower = question.lower()
+    lignes, colonnes = df.shape
+    
+    try:
+        # === Questions sur le nombre de lignes/colonnes ===
+        if "combien" in question_lower or "nombre" in question_lower:
+            if "ligne" in question_lower:
+                return f"📊 Vos données contiennent **{lignes} lignes**."
+            if "colonne" in question_lower:
+                return f"📋 Vos données contiennent **{colonnes} colonnes**."
+            return f"📊 Vos données: **{lignes}** lignes × **{colonnes}** colonnes."
+        
+        # === Questions sur les colonnes ===
+        if "colonne" in question_lower:
+            col_names = ", ".join(df.columns[:5])
+            if len(df.columns) > 5:
+                col_names += f", ... ({len(df.columns) - 5} autres)"
+            return f"📋 Colonnes principales: {col_names}"
+        
+        # === Questions sur les valeurs manquantes ===
+        if "manquant" in question_lower or "null" in question_lower or "missing" in question_lower:
+            nulls = df.isnull().sum()
+            null_total = nulls.sum()
+            if null_total == 0:
+                return "✅ Aucune valeur manquante détectée."
+            top_nulls = nulls[nulls > 0].nlargest(3)
+            top_text = ", ".join([f"{col}: {count}" for col, count in top_nulls.items()])
+            return f"⚠️ **{null_total}** valeurs manquantes. Top colonnes: {top_text}"
+        
+        # === Questions sur les doublons ===
+        if "duplic" in question_lower:
+            duplicates = df.duplicated().sum()
+            if duplicates == 0:
+                return "✅ Aucun doublon détecté."
+            return f"⚠️ **{duplicates} lignes dupliquées** détectées."
+        
+        # === Questions sur les tendances ===
+        if "tendance" in question_lower or "trend" in question_lower:
+            numeric_cols = df.select_dtypes(include=['number']).columns
+            if len(numeric_cols) == 0:
+                return "❌ Pas de colonnes numériques pour analyser les tendances."
+            
+            insights = []
+            for col in numeric_cols[:3]:
+                try:
+                    col_data = df[col].dropna()
+                    if len(col_data) > 1:
+                        first_half = col_data.iloc[:len(col_data)//2].mean()
+                        second_half = col_data.iloc[len(col_data)//2:].mean()
+                        if first_half != 0:
+                            change_pct = (second_half - first_half) / first_half * 100
+                            if change_pct > 5:
+                                trend = f"📈 **{col}**: +{change_pct:.1f}%"
+                            elif change_pct < -5:
+                                trend = f"📉 **{col}**: {change_pct:.1f}%"
+                            else:
+                                trend = f"➡️ **{col}**: {change_pct:+.1f}% (stable)"
+                            insights.append(trend)
+                except:
+                    pass
+            
+            if insights:
+                return "📊 Tendances détectées:\n" + "\n".join(insights)
+            return "➡️ Aucune tendance significative détectée."
+        
+        # === Questions sur les statistiques ===
+        if "moyen" in question_lower or "moyenne" in question_lower or "mean" in question_lower or "stats" in question_lower:
+            numeric_cols = df.select_dtypes(include=['number']).columns
+            if len(numeric_cols) == 0:
+                return "❌ Pas de colonnes numériques."
+            
+            stats_lines = []
+            for col in numeric_cols[:5]:
+                try:
+                    col_data = df[col].dropna()
+                    if len(col_data) > 0:
+                        mean_val = col_data.mean()
+                        min_val = col_data.min()
+                        max_val = col_data.max()
+                        stats_lines.append(f"**{col}**: μ={mean_val:.2f}, min={min_val:.2f}, max={max_val:.2f}")
+                except:
+                    pass
+            
+            if stats_lines:
+                return "📊 Statistiques:\n" + "\n".join(stats_lines)
+            return "❌ Erreur lors du calcul des statistiques."
+        
+        # === Questions sur la distribution ===
+        if "distrib" in question_lower or "distribution" in question_lower:
+            numeric_cols = df.select_dtypes(include=['number']).columns
+            if len(numeric_cols) == 0:
+                return "❌ Pas de colonnes numériques."
+            
+            insights = []
+            for col in numeric_cols[:3]:
+                try:
+                    col_data = df[col].dropna()
+                    if len(col_data) > 1:
+                        skew = col_data.skew()
+                        if abs(skew) > 1:
+                            skew_type = "très asymétrique" if abs(skew) > 2 else "asymétrique"
+                            direction = "à droite" if skew > 0 else "à gauche"
+                            insights.append(f"📊 **{col}**: {skew_type} {direction} (skew={skew:.2f})")
+                        else:
+                            insights.append(f"📊 **{col}**: distribution symétrique")
+                except:
+                    pass
+            
+            if insights:
+                return "\n".join(insights)
+            return "❌ Erreur lors de l'analyse de distribution."
+        
+        # === Questions sur les corrélations ===
+        if "corr" in question_lower or "relation" in question_lower:
+            numeric_cols = df.select_dtypes(include=['number']).columns
+            if len(numeric_cols) < 2:
+                return "❌ Besoin d'au moins 2 colonnes numériques pour analyser les corrélations."
+            
+            try:
+                corr_matrix = df[numeric_cols].corr()
+                corr_pairs = []
+                
+                for i in range(len(corr_matrix.columns)):
+                    for j in range(i+1, len(corr_matrix.columns)):
+                        corr_val = corr_matrix.iloc[i, j]
+                        if abs(corr_val) > 0.3:  # Corrélation significative
+                            strength = "très forte" if abs(corr_val) > 0.7 else "forte" if abs(corr_val) > 0.5 else "modérée"
+                            corr_pairs.append(f"🔗 **{corr_matrix.columns[i]}** ↔ **{corr_matrix.columns[j]}**: {corr_val:.3f} ({strength})")
+                
+                if corr_pairs:
+                    return "Corrélations détectées:\n" + "\n".join(corr_pairs[:5])
+                return "✅ Aucune corrélation significative (|r| > 0.3) détectée."
+            except:
+                return "❌ Erreur lors du calcul des corrélations."
+        
+        # === Questions sur la visualisation ===
+        if "visuali" in question_lower or "graphique" in question_lower or "plot" in question_lower or "chart" in question_lower:
+            return "📈 Utilisez l'onglet **Visualisation** pour créer: scatter, line, bar, histogram, box, violin plots."
+        
+        # === Questions sur les prédictions ===
+        if "prédict" in question_lower or "modèle" in question_lower or "predict" in question_lower or "régression" in question_lower or "classification" in question_lower:
+            return "🤖 L'onglet **Prédiction** utilise Random Forest (regression/classification) - entraîne sur vos données réelles."
+        
+        # === Questions sur le nettoyage ===
+        if "qualité" in question_lower or "quality" in question_lower or "nettoyer" in question_lower or "clean" in question_lower:
+            null_pct = (df.isnull().sum().sum() / (df.shape[0] * df.shape[1]) * 100)
+            duplicates = df.duplicated().sum()
+            return f"✨ Qualité: {null_pct:.1f}% manquantes, {duplicates} doublons. Utilisez l'onglet **Nettoyage** pour améliorer."
+        
+        # === Questions sur le type de données ===
+        if "type" in question_lower or "dtype" in question_lower:
+            dtypes = df.dtypes.value_counts()
+            dtype_text = ", ".join([f"{count} {dtype}" for dtype, count in dtypes.items()])
+            return f"📝 Types de données: {dtype_text}"
+        
+        # === Résumé général ===
+        if any(word in question_lower for word in ["quoi", "what", "tell", "dis", "info", "informations", "donne"]):
+            numeric_cols = df.select_dtypes(include=['number']).columns
+            categorical_cols = df.select_dtypes(include=['object']).columns
+            null_pct = (df.isnull().sum().sum() / (df.shape[0] * df.shape[1]) * 100)
+            
+            summary = f"📊 **Résumé des données:**\n"
+            summary += f"- {lignes} lignes × {colonnes} colonnes\n"
+            summary += f"- {len(numeric_cols)} colonnes numériques, {len(categorical_cols)} colonnes text\n"
+            summary += f"- {null_pct:.1f}% valeurs manquantes\n"
+            summary += f"- {df.duplicated().sum()} doublons"
+            return summary
+        
+        # === Réponse par défaut intelligente ===
+        return f"💡 **{lignes}** lignes × **{colonnes}** colonnes. Posez des questions sur: tendances, corrélations, stats, qualité, types de données, ou utilisez les onglets Visualisation/Prédiction."
+    
+    except Exception as e:
+        return f"❌ Erreur lors de l'analyse: {str(e)[:50]}"
 
 
 def generate_smart_response(question: str, context: str = None, df=None) -> str:
