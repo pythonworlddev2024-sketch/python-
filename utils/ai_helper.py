@@ -339,22 +339,40 @@ def get_ai_response(question: str, context: str = None, df=None) -> str:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-2.5-flash')
         
+        # Configuration pour des réponses plus détaillées
+        generation_config = genai.types.GenerationConfig(
+            temperature=0.7,  # Plus créatif
+            top_p=0.9,
+            top_k=40,
+            max_output_tokens=1000,  # Plus long
+        )
+        
         # Préparer le contexte AVANCÉ des données
         context_text = ""
         if df is not None and len(df) > 0:
             context_text = _build_advanced_context(df)
         
-        prompt = f"""Tu dois répondre EXTRÊMEMENT BRIÈVEMENT en une ou deux phrases maximum.
-Pas d'explications, pas de détails, pas de conseils.
-Juste la réponse directe à la question.
+        prompt = f"""Tu es un expert en analyse de données. Réponds de manière DÉTAILLÉE et UTILE à la question posée.
 
+CONTEXTE DES DONNÉES:
 {context_text}
 
 Question: {question}
 
-Réponse ultra-courte (1-2 phrases MAX):"""
+INSTRUCTIONS:
+- Donne une réponse complète et détaillée (pas de limite de longueur)
+- Inclus TOUJOURS des conseils pratiques et des suggestions d'amélioration
+- Explique les implications des résultats trouvés
+- Propose des prochaines étapes concrètes pour l'analyse
+- Si c'est pertinent, suggère des visualisations ou analyses supplémentaires
+- Sois pédagogique et explique les concepts statistiques si nécessaire
+
+Réponse détaillée avec conseils:"""
         
-        response = model.generate_content(prompt)
+        response = model.generate_content(
+            prompt,
+            generation_config=generation_config
+        )
         if response and response.text:
             return response.text.strip()
         else:
@@ -1039,4 +1057,3 @@ def extract_text_value(text: str, keyword: str) -> str:
         return match.group(1).strip()
     
     return "N/A"
-
