@@ -1,172 +1,101 @@
 """
-Page d'accueil avec animation et bouton de démarrage
+Page d'accueil avec design professionnel Dark Blue AI
 """
 import streamlit as st
 
 
 def show_home():
-    """Afficher la page d'accueil"""
-    
-    # CSS pour les animations
+    """Afficher la page d'accueil avec design Dark Blue AI"""
+
+    # Configuration de la page
+    st.set_page_config(
+        page_title="DataViz AI Analytics",
+        page_icon="📊",
+        layout="wide",
+        initial_sidebar_state="collapsed"
+    )
+
+    # Appliquer le thème sombre
     st.markdown("""
         <style>
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        .stApp {
+            background-color: #0E1117;
+            color: #F3F4F6;
         }
-        
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-        
-        .title-container {
-            text-align: center;
-            animation: fadeIn 0.8s ease-in;
-            padding: 60px 20px;
-        }
-        
-        .main-title {
-            font-size: 48px;
-            font-weight: bold;
-            background: linear-gradient(135deg, #3498db, #2ecc71);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 20px;
-        }
-        
-        .subtitle {
-            font-size: 20px;
-            color: #7f8c8d;
-            margin-bottom: 40px;
-            line-height: 1.6;
-        }
-        
-        .cta-button {
-            display: inline-block;
-            padding: 15px 50px;
-            background: linear-gradient(135deg, #3498db, #2980b9);
-            color: white;
-            text-decoration: none;
-            border-radius: 50px;
-            font-size: 18px;
-            font-weight: bold;
-            animation: pulse 2s infinite;
-            transition: transform 0.3s;
-        }
-        
-        .cta-button:hover {
-            transform: scale(1.1);
-        }
-        
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin: 60px 0;
-            animation: fadeIn 1.2s ease-in;
-        }
-        
-        .feature-card {
-            padding: 25px;
-            border-radius: 10px;
-            background: linear-gradient(135deg, #ecf0f1, #bdc3c7);
-            text-align: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            transition: transform 0.3s;
-        }
-        
-        .feature-card:hover {
-            transform: translateY(-5px);
-        }
-        
-        .feature-icon {
-            font-size: 40px;
-            margin-bottom: 15px;
-        }
-        
-        .feature-title {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            color: #2c3e50;
-        }
-        
-        .feature-description {
-            font-size: 14px;
-            color: #555;
-            line-height: 1.5;
+        .stSidebar {
+            background-color: #111827;
         }
         </style>
     """, unsafe_allow_html=True)
-    
-    # Titre et sous-titre animés
-    st.markdown("""
-        <div class="title-container">
-            <h1 class="main-title">📊 DataViz AI Analytics</h1>
-            <p class="subtitle">
-                Transformez vos données brutes en insights actionnables<br>
-                Analyse intelligente • Prédictions précises • Interface intuitive
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # Bouton de démarrage
+
+    # Bouton Déconnexion en haut à droite
+    col1, col2 = st.columns([4, 1])
+    with col2:
+        if st.button("Déconnexion", key="logout_home"):
+            st.session_state.authenticated = False
+            st.session_state.current_page = "login"
+            st.rerun()
+
+    # Titre principal centré
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("🚀 Commencer", width='stretch', type="primary", key="btn_start"):
-            st.session_state.show_upload = True
+        st.title("DataViz AI Analytics")
+        st.subheader("Transformez vos données brutes en insights actionnables")
+        st.subheader("Analyse intelligente • Prédictions précises • Interface intuitive")
+
+    # Bouton Start centré
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        if st.button("Start", type="primary", use_container_width=True):
+            st.session_state.current_page = "login"
             st.rerun()
-    
+
     st.divider()
-    
+
     # Fonctionnalités
-    st.markdown("""
-        <div class="features">
-            <div class="feature-card">
-                <div class="feature-icon">📤</div>
-                <div class="feature-title">Import Facile</div>
-                <div class="feature-description">Importez vos fichiers CSV ou Excel en un clic</div>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🧹</div>
-                <div class="feature-title">Nettoyage Automique</div>
-                <div class="feature-description">Supprimez doublons et valeurs aberrantes</div>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">📈</div>
-                <div class="feature-title">Visualisation</div>
-                <div class="feature-description">Graphiques interactifs et professionnels</div>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🤖</div>
-                <div class="feature-title">IA Gratuite</div>
-                <div class="feature-description">Predictions et conseils alimentés par l'IA</div>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">💡</div>
-                <div class="feature-title">Insights Intelligents</div>
-                <div class="feature-description">Recommandations basées sur vos données</div>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">📥</div>
-                <div class="feature-title">Téléchargement</div>
-                <div class="feature-description">Exportez vos données nettoyées et rapports</div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # Section supplémentaire
-    st.markdown("""
-        <div style="text-align: center; margin-top: 60px; padding: 30px; background: #f8f9fa; border-radius: 10px;">
-            <h3 style="color: #3498db;">Comment ça fonctionne ?</h3>
-            <p style="font-size: 16px; color: #555; line-height: 1.8;">
-                <strong>1. Importez</strong> vos données (CSV ou Excel)<br>
-                <strong>2. Analysez</strong> avec nos outils de nettoyage<br>
-                <strong>3. Visualisez</strong> vos données avec des graphiques interactifs<br>
-                <strong>4. Prédisez</strong> en utilisant l'IA et le machine learning<br>
-                <strong>5. Exportez</strong> vos résultats et rapports
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
+    st.subheader("Fonctionnalités principales")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("### Import Facile")
+        st.write("Importez vos fichiers CSV ou Excel en un clic")
+
+        st.markdown("### Nettoyage Automatique")
+        st.write("Supprimez doublons et valeurs aberrantes")
+
+    with col2:
+        st.markdown("### Visualisation")
+        st.write("Graphiques interactifs et professionnels")
+
+        st.markdown("### IA Gratuite")
+        st.write("Predictions et conseils alimentés par l'IA")
+
+    with col3:
+        st.markdown("### Insights Intelligents")
+        st.write("Recommandations basées sur vos données")
+
+        st.markdown("### Téléchargement")
+        st.write("Exportez vos données nettoyées et rapports")
+
+    # Section "Comment ça fonctionne"
+    st.subheader("Comment ça fonctionne ?")
+
+    st.write("""
+    1. **Importez** vos données (CSV ou Excel)
+    2. **Analysez** avec nos outils de nettoyage
+    3. **Visualisez** vos données avec des graphiques interactifs
+    4. **Prédisez** en utilisant l'IA et le machine learning
+    5. **Exportez** vos résultats et rapports
+    """)
+
+    # Bouton AI flottant en bas à droite (simulé avec columns)
+    col1, col2 = st.columns([4, 1])
+    with col2:
+        if st.button("🤖 AI", key="ai_button_home"):
+            with st.expander("Assistant IA", expanded=True):
+                st.write("Posez-moi une question sur vos données...")
+                user_question = st.text_input("Votre question:", key="ai_question_home")
+                if user_question:
+                    # Ici on pourrait appeler la fonction AI
+                    st.write(f"Question: {user_question}")
+                    st.info("Réponse de l'IA apparaîtrait ici...")
