@@ -18,7 +18,7 @@ if not st.session_state.google_api_key:
 
 # Optional: Allow user to enter API key for faster/better AI responses
 if not st.session_state.google_api_key:
-    with st.expander("🚀 (Optionnel) Activer Google Gemini pour des réponses IA plus rapides"):
+    with st.expander("(Optionnel) Activer Google Gemini pour des réponses IA plus rapides"):
         st.info("L'IA fonctionne déjà gratuitement. Entrez une clé Google Gemini API pour des réponses plus rapides et de meilleure qualité.")
         api_key_input = st.text_input(
             "Google API Key (Gemini)",
@@ -28,7 +28,7 @@ if not st.session_state.google_api_key:
         )
         if api_key_input:
             st.session_state.google_api_key = api_key_input
-            st.success("✅ Clé Gemini activée !")
+            st.success("Clé Gemini activée !")
 
 # Configuration de la page Streamlit
 st.set_page_config(
@@ -38,9 +38,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS personnalisé - Design Professionnel Moderne
-st.markdown("""
-    <style>
+# Initialiser les variables de session
     /* Variables de couleur */
     :root {
         --primary-color: #2563eb;
