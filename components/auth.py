@@ -68,7 +68,8 @@ def show_login():
             elif verify_user(email, password):
                 st.session_state.authenticated = True
                 st.session_state.user_email = email
-                st.session_state.current_page = "upload"
+                # après connexion on revient sur l'accueil (onglet Accueil)
+                st.session_state.show_upload = False
                 st.success("Connexion réussie !")
                 st.rerun()
             else:
