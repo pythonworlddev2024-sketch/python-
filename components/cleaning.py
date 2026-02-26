@@ -121,6 +121,19 @@ def show_analysis_tab():
     numeric_cols = df.select_dtypes(include=['number']).columns
     cat_cols = df.select_dtypes(include=['object']).columns
 
+    # Calculer statistiques détaillées via utilitaire
+    stats = get_column_stats(df)
+    # Convertir en DataFrame facilement
+    df_stats = pd.DataFrame.from_dict(stats, orient='index')
+    df_stats.index.name = 'Colonne'
+    df_stats.reset_index(inplace=True)
+    # renommer colonnes pour affichage
+    df_stats = df_stats.rename(columns={
+        'unique_values': 'Valeurs Uniques',
+        'most_common': 'Plus Commun',
+        'null_count': 'Manquants'
+    })
+
     if len(numeric_cols) > 0:
         st.write("**Colonnes numériques :**")
         for col in numeric_cols[:5]:  # Limiter à 5 pour lisibilité
@@ -147,25 +160,8 @@ def show_analysis_tab():
             value_counts = df[col].value_counts().head(10)
             fig = px.bar(value_counts, title=f"Distribution de {col}")
             st.plotly_chart(fig, use_container_width=True)
-                "Type": "Quantitative",
-                "Min": f"{stats['min']:.2f}" if isinstance(stats['min'], (int, float)) else stats['min'],
-                "Max": f"{stats['max']:.2f}" if isinstance(stats['max'], (int, float)) else stats['max'],
-                "Moyenne": f"{stats['mean']:.2f}" if pd.notna(stats['mean']) else "N/A",
-                "Médiane": f"{stats['median']:.2f}" if pd.notna(stats['median']) else "N/A",
-                "Manquants": stats['null_count'],
-                "Remarque": stats.get('remark') if stats.get('remark') else ""
-            })
-        else:
-            stats_list.append({
-                "Colonne": col_name,
-                "Type": "Qualitative",
-                "Valeurs Uniques": stats['unique_values'],
-                "Plus Commun": stats['most_common'],
-                "Manquants": stats['null_count'],
-                "Remarque": ""
-            })
     
-    df_stats = pd.DataFrame(stats_list)
+    # afficher les stats générées précédemment
     st.dataframe(df_stats, width="stretch")
     
     st.divider()
