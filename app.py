@@ -39,8 +39,8 @@ st.set_page_config(
 )
 
 # Initialiser les variables de session
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
     st.session_state.user_email = None
     st.session_state.df = None
     st.session_state.df_path = None
@@ -48,7 +48,7 @@ if "logged_in" not in st.session_state:
 
 # ============== CONTENU PRINCIPAL ==============
 
-if not st.session_state.logged_in:
+if not st.session_state.authenticated:
     # Page d'authentification
     from components.auth import show_auth_page
     show_auth_page()
@@ -77,7 +77,7 @@ else:
                 st.caption(f"👤 {st.session_state.user_email}")
         with col_logout:
             if st.button("🚪 Déconv.", width='stretch'):
-                st.session_state.logged_in = False
+                st.session_state.authenticated = False
                 st.session_state.user_email = None
                 st.session_state.df = None
                 st.rerun()
