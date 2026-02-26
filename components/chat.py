@@ -5,7 +5,6 @@ import streamlit as st
 from utils.data_processor import get_data_summary
 from utils.ai_helper import get_ai_response
 
-
 def show_floating_chat():
     """Afficher le chat flottant sur la barre latérale avec vraies données"""
 
